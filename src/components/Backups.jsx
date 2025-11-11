@@ -270,7 +270,7 @@ export function Backups() {
           <button 
             onClick={fetchBackups}
             disabled={isLoading}
-            className="btn-primary"
+            className="btn-primary flex items-center"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             刷新
