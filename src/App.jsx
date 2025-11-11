@@ -6,6 +6,17 @@ import { Images } from './components/Images.jsx'
 import { Settings } from './components/Settings.jsx'
 import { Backups } from './components/Backups.jsx'
 import { ThemeProvider } from './hooks/useTheme.jsx'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+// 创建一个全局的QueryClient实例
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+})
 
 function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -100,9 +111,11 @@ function AppContent() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </QueryClientProvider>
   )
 }
 
