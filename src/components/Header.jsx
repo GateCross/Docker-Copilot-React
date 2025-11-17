@@ -9,9 +9,7 @@ import {
   Image,
   Settings,
   DatabaseBackup,
-  Palette,
-  ChevronLeft,
-  ChevronRight
+  Palette
 } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle.jsx'
 import { cn } from '../utils/cn.js'
@@ -88,29 +86,27 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
         <div className="flex flex-col h-full">
           {/* 头部 */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center space-x-3">
-              <img 
-                {...LOGO_CONFIG}
-              />
-              {!sidebarCollapsed && (
-                <div className="transition-opacity duration-300">
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">Docker Copilot</h1>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">容器管理平台</p>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center space-x-1">
-              {/* 桌面端收起按钮 */}
+            <div className="flex items-center justify-between w-full">
+              {/* Logo区域 - 点击可收起/展开 */}
               <button
                 onClick={handleToggleCollapse}
-                className="hidden lg:block p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="flex items-center space-x-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg p-2 -m-2 transition-colors cursor-pointer group"
+                title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
               >
-                {sidebarCollapsed ? (
-                  <ChevronRight className="h-4 w-4" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4" />
+                <div className="flex-shrink-0">
+                  <img 
+                    {...LOGO_CONFIG}
+                    className="h-10 w-10 rounded-xl object-cover flex-shrink-0 group-hover:scale-105 transition-transform duration-200"
+                  />
+                </div>
+                {!sidebarCollapsed && (
+                  <div className="text-left transition-all duration-300">
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">Docker Copilot</h1>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">容器管理平台</p>
+                  </div>
                 )}
               </button>
+              
               {/* 移动端关闭按钮 */}
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
