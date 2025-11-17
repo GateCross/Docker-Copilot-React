@@ -71,17 +71,13 @@ export const containerAPI = {
   stopContainer: (id) => apiClient.post(`/api/container/${id}/stop`),
   restartContainer: (id) => apiClient.post(`/api/container/${id}/restart`),
   renameContainer: (id, newName) => {
-    const formData = new FormData()
-    formData.append('newName', newName)
-    return apiClient.post(`/api/container/${id}/rename`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    return apiClient.post(`/api/container/${id}/rename?newName=${encodeURIComponent(newName)}`)
   },
-  updateContainer: (id, imageNameAndTag, containerName, delOldContainer) => {
+  updateContainer: (id, containerName, imageNameAndTag, delOldContainer) => {
     const formData = new FormData()
-    formData.append('imageNameAndTag', imageNameAndTag)
     formData.append('containerName', containerName)
-    formData.append('delOldContainer', delOldContainer)
+    formData.append('imageNameAndTag', imageNameAndTag)
+    formData.append('delOldContainer', delOldContainer ? 'true' : 'false')
     return apiClient.post(`/api/container/${id}/update`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
@@ -89,13 +85,9 @@ export const containerAPI = {
   backupContainer: () => apiClient.get('/api/container/backup'),
   listBackups: () => apiClient.get('/api/container/listBackups'),
   restoreContainer: (filename) => {
-    const formData = new FormData()
-    formData.append('filename', filename)
-    return apiClient.post('/api/container/backups/restore', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    return apiClient.post(`/api/container/backups/${filename}/restore`)
   },
-  deleteBackup: (filename) => apiClient.delete(`/api/container/backups?filename=${filename}`),
+  deleteBackup: (filename) => apiClient.delete(`/api/container/backups/${filename}`),
   backupToCompose: () => apiClient.get('/api/container/backup2compose'),
 }
 

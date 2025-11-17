@@ -15,9 +15,11 @@ import {
   CheckCircle,
   AlertCircle,
   X,
-  Info
+  Info,
+  List,
+  Grid
 } from 'lucide-react'
-import { containerAPI } from '../api/client.js'
+import { containerAPI, progressAPI } from '../api/client.js'
 import { cn } from '../utils/cn.js'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { getImageLogo } from '../config/imageLogos.js'
@@ -31,20 +33,26 @@ export function Containers() {
   const [isBatchMode, setIsBatchMode] = useState(false)
   // 添加操作状态跟踪
   const [containerActions, setContainerActions] = useState({}) // 跟踪每个容器的操作状态
+  const [updateTasks, setUpdateTasks] = useState({}) // 跟踪更新任务
+  // 添加视图模式状态
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('containerViewMode') || 'list'
+  })
+
+  // 切换视图模式
+  const toggleViewMode = (mode) => {
+    setViewMode(mode)
+    localStorage.setItem('containerViewMode', mode)
+  }
 
   // 使用React Query获取容器列表
   const { data: containers = [], isLoading, refetch } = useQuery({
     queryKey: ['containers'],
     queryFn: async () => {
       const response = await containerAPI.getContainers()
-      if (response.data.code === 0) {
-        // 调试：打印容器数据结构
+      if (response.data.code === 200 || response.data.code === 0) {
         console.log('容器数据:', response.data.data)
-        if (response.data.data && response.data.data.length > 0) {
-          console.log('第一个容器对象:', response.data.data[0])
-          console.log('容器对象字段:', Object.keys(response.data.data[0]))
-        }
-        return response.data.data
+        return response.data.data || []
       } else {
         throw new Error(response.data.msg)
       }
@@ -62,24 +70,25 @@ export function Containers() {
         [containerId]: { action, loading: true }
       }))
       
+      let response
       switch (action) {
         case 'start':
-          await containerAPI.startContainer(containerId)
+          response = await containerAPI.startContainer(containerId)
           break
         case 'stop':
-          await containerAPI.stopContainer(containerId)
+          response = await containerAPI.stopContainer(containerId)
           break
         case 'restart':
-          await containerAPI.restartContainer(containerId)
+          response = await containerAPI.restartContainer(containerId)
           break
         default:
           break
       }
-      
+
       // 立即更新本地状态，提供即时反馈
       queryClient.setQueryData(['containers'], (oldData) => {
         if (!oldData) return oldData
-        
+
         return oldData.map(container => {
           if (container.id === containerId) {
             let newStatus = container.status
@@ -101,19 +110,19 @@ export function Containers() {
           return container
         })
       })
-      
+
       // 清除操作状态
       setContainerActions(prev => {
         const newState = { ...prev }
         delete newState[containerId]
         return newState
       })
-      
-      // 延迟无效化查询以获取最新数据
+
+      // 延迟刷新以获取最新数据
       setTimeout(() => {
-        queryClient.invalidateQueries(['containers'])
-      }, 1000)
-      
+        refetch()
+      }, 1500)
+
     } catch (error) {
       console.error('操作失败:', error)
       // 清除操作状态
@@ -122,9 +131,7 @@ export function Containers() {
         delete newState[containerId]
         return newState
       })
-      if (error.response?.status === 401) {
-        console.error('认证失败，请重新登录')
-      }
+      console.error(`操作失败: ${error.response?.data?.msg || error.message}`)
     }
   }
 
@@ -180,14 +187,6 @@ export function Containers() {
             case 'restart':
               await containerAPI.restartContainer(containerId)
               break
-            case 'update':
-              // 这里需要实现更新逻辑，暂时留空
-              // 为了简化，我们使用容器当前的镜像信息进行更新
-              const container = containers.find(c => c.id === containerId)
-              if (container) {
-                await containerAPI.updateContainer(containerId, container.usingImage, container.name, true)
-              }
-              break
             default:
               break
           }
@@ -200,11 +199,11 @@ export function Containers() {
           })
         }
       }
-      
-      // 延迟无效化查询以获取最新数据
+
+      // 延迟刷新以获取最新数据
       setTimeout(() => {
-        queryClient.invalidateQueries(['containers'])
-      }, 1000)
+        refetch()
+      }, 1500)
       
       // 清除选中状态
       setSelectedContainers([])
@@ -224,22 +223,200 @@ export function Containers() {
 
   const handleRenameContainer = async (containerId, newName) => {
     try {
-      await containerAPI.renameContainer(containerId, newName)
-      // 无效化查询以触发重新获取数据
-      await queryClient.invalidateQueries(['containers'])
+      const response = await containerAPI.renameContainer(containerId, newName)
+      if (response.data.code === 200 || response.data.code === 0) {
+        await refetch()
+        console.log('重命名成功')
+      }
     } catch (error) {
       console.error('重命名容器失败:', error)
+      console.error(`重命名失败: ${error.response?.data?.msg || error.message}`)
     }
   }
 
-  const handleUpdateContainer = async (containerId, imageNameAndTag, containerName, delOldContainer) => {
+  const handleUpdateContainer = async (containerId) => {
     try {
-      await containerAPI.updateContainer(containerId, imageNameAndTag, containerName, delOldContainer)
-      // 无效化查询以触发重新获取数据
-      await queryClient.invalidateQueries(['containers'])
+      const container = containers.find(c => c.id === containerId)
+      if (!container) {
+        console.error('容器未找到')
+        return
+      }
+
+      console.log(`开始更新容器 "${container.name}"，使用镜像: ${container.usingImage}`)
+
+      setContainerActions(prev => ({
+        ...prev,
+        [containerId]: { action: 'update', loading: true, progress: '正在准备更新...', percentage: 0 }
+      }))
+
+      // 注意参数顺序: id, containerName, imageNameAndTag, delOldContainer
+      const response = await containerAPI.updateContainer(
+        containerId,
+        container.name,
+        container.usingImage,
+        true
+      )
+
+      console.log('更新容器响应:', response.data)
+
+      if (response.data.code === 200 || response.data.code === 0) {
+        const taskID = response.data.data?.taskID
+
+        if (taskID) {
+          console.log('开始轮询进度, taskID:', taskID)
+          // 保存任务ID并开始轮询进度
+          setUpdateTasks(prev => ({
+            ...prev,
+            [containerId]: taskID
+          }))
+
+          pollProgress(containerId, taskID)
+        } else {
+          // 如果没有返回taskID,说明更新可能立即完成
+          setContainerActions(prev => {
+            const newState = { ...prev }
+            delete newState[containerId]
+            return newState
+          })
+          await refetch()
+          alert('容器更新完成')
+        }
+      } else {
+        throw new Error(response.data.msg || '更新失败')
+      }
     } catch (error) {
       console.error('更新容器失败:', error)
+      setContainerActions(prev => {
+        const newState = { ...prev }
+        delete newState[containerId]
+        return newState
+      })
+      alert(`更新失败: ${error.response?.data?.msg || error.message}`)
     }
+  }
+
+  // 轮询进度
+  const pollProgress = async (containerId, taskID) => {
+    const maxAttempts = 60 // 最多轮询60次 (2分钟)
+    let attempts = 0
+    let pollTimer = null
+
+    const clearPollState = () => {
+      if (pollTimer) {
+        clearTimeout(pollTimer)
+        pollTimer = null
+      }
+      setContainerActions(prev => {
+        const newState = { ...prev }
+        delete newState[containerId]
+        return newState
+      })
+      setUpdateTasks(prev => {
+        const newState = { ...prev }
+        delete newState[containerId]
+        return newState
+      })
+    }
+
+    const poll = async () => {
+      try {
+        attempts++
+        const response = await progressAPI.getProgress(taskID)
+        console.log(`进度查询[${attempts}/${maxAttempts}]:`, response.data)
+
+        const data = response.data
+
+        // 提取进度信息
+        let progressMsg = '处理中...'
+        let percentage = 0
+
+        if (data.data?.progress) {
+          progressMsg = data.data.progress
+        } else if (data.data?.message) {
+          progressMsg = data.data.message
+        } else if (data.msg) {
+          progressMsg = data.msg
+        }
+
+        // 提取百分比
+        if (data.data?.percentage !== undefined) {
+          percentage = Math.min(100, Math.max(0, parseFloat(data.data.percentage)))
+        } else if (data.data?.percent !== undefined) {
+          percentage = Math.min(100, Math.max(0, parseFloat(data.data.percent)))
+        } else {
+          // 尝试从进度消息中提取百分比
+          const percentMatch = progressMsg.match(/(\d+(?:\.\d+)?)\s*%/)
+          if (percentMatch) {
+            percentage = Math.min(100, Math.max(0, parseFloat(percentMatch[1])))
+          } else {
+            // 根据轮询次数估算进度
+            percentage = Math.min(95, (attempts / maxAttempts) * 100)
+          }
+        }
+
+        // 检查是否完成 - 兼容多种响应格式
+        const status = data.data?.status || data.status
+        const isCompleted = status === 'completed' || 
+                          status === 'success' || 
+                          status === 'done' ||
+                          status === 'finish' ||
+                          status === 'finished' ||
+                          progressMsg.includes('完成') ||
+                          progressMsg.includes('成功') ||
+                          (data.code === 200 && (data.msg === 'success' || data.msg === '操作成功'))
+
+        // 检查是否失败
+        const isFailed = status === 'failed' || 
+                        status === 'error' ||
+                        progressMsg.includes('失败') ||
+                        progressMsg.includes('错误') ||
+                        data.code === 500 ||
+                        data.code === 400
+
+        if (isCompleted) {
+          // 任务完成 - 立即停止轮询
+          console.log('容器更新完成，停止轮询')
+          clearPollState()
+          await refetch()
+          console.log('✅ 容器更新完成!')
+          return // 确保不再继续执行
+        }
+
+        if (isFailed) {
+          // 任务失败 - 立即停止轮询
+          console.log('容器更新失败，停止轮询')
+          clearPollState()
+          console.error(`❌ 更新失败: ${data.data?.error || data.msg || '更新失败'}`)
+          return // 确保不再继续执行
+        }
+
+        // 更新容器操作状态，显示进度
+        setContainerActions(prev => ({
+          ...prev,
+          [containerId]: { 
+            action: 'update', 
+            loading: true,
+            progress: progressMsg,
+            percentage: percentage
+          }
+        }))
+
+        // 继续轮询
+        if (attempts < maxAttempts) {
+          pollTimer = setTimeout(poll, 2000) // 2秒后再次查询
+        } else {
+          clearPollState()
+          console.error('⏱️ 更新超时，请检查容器状态')
+        }
+      } catch (error) {
+        console.error('查询进度失败:', error)
+        clearPollState()
+        console.error(`❌ 更新失败: ${error.response?.data?.msg || error.message}`)
+      }
+    }
+
+    // 开始轮询
+    poll()
   }
 
   // 容器选择处理函数
@@ -264,11 +441,12 @@ export function Containers() {
     const statusConfig = {
       running: { label: '运行中', className: 'badge-success' },
       stopped: { label: '已停止', className: 'badge-error' },
+      exited: { label: '已退出', className: 'badge-error' },
       restarting: { label: '重启中', className: 'badge-warning' },
       paused: { label: '已暂停', className: 'badge-info' }
     }
-    
-    const config = statusConfig[status] || { label: status, className: 'badge-info' }
+
+    const config = statusConfig[status?.toLowerCase()] || { label: status, className: 'badge-info' }
     
     return (
       <span className={cn('badge', config.className)}>
@@ -299,6 +477,12 @@ export function Containers() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+      `}</style>
       {/* 页面标题和操作 */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
         <div>
@@ -310,7 +494,34 @@ export function Containers() {
         
         {/* 批量操作按钮区域 */}
         {!isBatchMode ? (
-          <div className="flex space-x-3">
+          <div className="flex items-center space-x-3">
+            {/* 视图切换按钮 */}
+            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+              <button
+                onClick={() => toggleViewMode('list')}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  viewMode === 'list'
+                    ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                )}
+                title="列表视图"
+              >
+                <List className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => toggleViewMode('grid')}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  viewMode === 'grid'
+                    ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                )}
+                title="网格视图"
+              >
+                <Grid className="h-4 w-4" />
+              </button>
+            </div>
             <button 
               className="btn-secondary"
               onClick={() => setIsBatchMode(true)}
@@ -379,31 +590,75 @@ export function Containers() {
       </div>
 
       {/* 容器列表 */}
-      <div className="space-y-4">
+      <div className={cn(
+        viewMode === 'grid' 
+          ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" 
+          : "space-y-4"
+      )}>
         {containers.map((container) => (
-          <div key={container.id} className="card p-6">
-            <div className="flex items-center justify-between">
-              {/* 容器选择和基本信息 */}
-              <div className="flex items-center space-x-4">
-                {isBatchMode && (
-                  <div className="flex-shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={selectedContainers.includes(container.id)}
-                      onChange={() => toggleContainerSelection(container.id)}
-                      className="h-5 w-5 text-primary-600 rounded focus:ring-primary-500"
-                    />
+          <div key={container.id} className={cn(
+            "card relative overflow-hidden",
+            viewMode === 'grid' ? "p-4" : "p-6"
+          )}>
+            {/* 背景进度条 */}
+            {containerActions[container.id]?.loading && containerActions[container.id]?.action === 'update' && (
+              <div className="absolute inset-0 pointer-events-none">
+                <div 
+                  className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-primary-500/30 via-primary-400/30 to-primary-500/30 transition-all duration-500 ease-out"
+                  style={{
+                    width: `${containerActions[container.id].percentage || 0}%`
+                  }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"
+                       style={{
+                         backgroundSize: '200% 100%',
+                         animation: 'shimmer 2s infinite linear'
+                       }} />
+                </div>
+                {/* 进度百分比显示 */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-primary-600/90 dark:bg-primary-500/90 text-white px-4 py-1 rounded-full text-sm font-semibold shadow-lg backdrop-blur-sm">
+                    {Math.round(containerActions[container.id].percentage || 0)}%
                   </div>
-                )}
-                <div className="flex-shrink-0">
-                  {(() => {
-                    // 获取镜像logo数据
-                    const imageLogos = JSON.parse(localStorage.getItem('docker_copilot_image_logos') || '{}');
-                    // 查找匹配的镜像图标
-                    let iconUrl = container.iconUrl;
-                    
-                    // 如果容器没有自定义图标，则查找镜像图标
-                    if (!iconUrl && container.usingImage) {
+                </div>
+              </div>
+            )}
+            <div className={cn(
+              "relative z-10",
+              viewMode === 'grid' 
+                ? "flex flex-col space-y-3" 
+                : "flex items-center justify-between"
+            )}>
+              {/* 容器选择和基本信息 */}
+              <div className={cn(
+                viewMode === 'grid'
+                  ? "flex flex-col space-y-3"
+                  : "flex items-center space-x-4"
+              )}>
+                {/* 容器图标和标题 */}
+                <div className={cn(
+                  "flex items-center",
+                  viewMode === 'grid' ? "space-x-3" : "space-x-4"
+                )}>
+                  {isBatchMode && (
+                    <div className="flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedContainers.includes(container.id)}
+                        onChange={() => toggleContainerSelection(container.id)}
+                        className="h-5 w-5 text-primary-600 rounded focus:ring-primary-500"
+                      />
+                    </div>
+                  )}
+                  <div className="flex-shrink-0">
+                    {(() => {
+                      // 获取镜像logo数据
+                      const imageLogos = JSON.parse(localStorage.getItem('docker_copilot_image_logos') || '{}');
+                      // 查找匹配的镜像图标
+                      let iconUrl = container.iconUrl;
+
+                      // 如果容器没有自定义图标，则查找镜像图标
+                      if (!iconUrl && container.usingImage) {
                       // 首先尝试使用内置logo配置
                       const builtInLogo = getImageLogo(container.usingImage, imageLogos);
                       if (builtInLogo) {
@@ -450,52 +705,74 @@ export function Containers() {
                       );
                     }
                   })()}
-                </div>
-                <div className="min-w-0 flex-1">
                   <div className="flex items-center space-x-2">
                     <h3 
-                      className="text-lg font-semibold text-gray-900 dark:text-white truncate cursor-pointer hover:underline"
+                      className={cn(
+                        "font-semibold text-gray-900 dark:text-white truncate cursor-pointer hover:underline",
+                        viewMode === 'grid' ? "text-base" : "text-lg"
+                      )}
                       onClick={() => setSelectedContainer(container)}
                     >
                       {container.name}
                     </h3>
                     {container.haveUpdate && (
-                      <span className="badge-warning">可更新</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                    {container.usingImage}
-                  </p>
-                  <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>创建: {new Date(container.createTime).toLocaleDateString()}</span>
-                    </div>
-                    {container.status === 'running' && (
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-3 w-3" />
-                        <span>运行: {container.runningTime}</span>
-                      </div>
+                      <span className="badge-warning text-xs">可更新</span>
                     )}
                   </div>
                 </div>
               </div>
 
+                {/* 容器镜像信息 */}
+                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                  {container.usingImage}
+                </p>
+
+                {/* 显示操作进度 */}
+                {containerActions[container.id]?.loading && containerActions[container.id]?.progress && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 truncate">
+                    {containerActions[container.id].progress}
+                  </p>
+                )}
+
+                {/* 容器元信息 */}
+                <div className={cn(
+                  "flex items-center text-xs text-gray-500 dark:text-gray-400",
+                  viewMode === 'grid' ? "flex-col items-start space-y-1" : "space-x-4"
+                )}>
+                  <div className="flex items-center space-x-1">
+                    <Calendar className="h-3 w-3" />
+                    <span>创建: {new Date(container.createTime).toLocaleDateString()}</span>
+                  </div>
+                  {container.status === 'running' && (
+                    <div className="flex items-center space-x-1">
+                      <Clock className="h-3 w-3" />
+                      <span>运行: {container.runningTime}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* 容器操作按钮 */}
-              <div className="flex items-center space-x-3">
+              <div className={cn(
+                "flex items-center",
+                viewMode === 'grid' ? "justify-between pt-3 border-t border-gray-200 dark:border-gray-700" : "space-x-3"
+              )}>
                 {getStatusBadge(container.status)}
                 
                 {/* 单个容器操作按钮（非批量模式下显示） */}
                 {!isBatchMode && (
-                  <div className="flex space-x-2">
+                  <div className={cn(
+                    "flex items-center",
+                    viewMode === 'grid' ? "flex-wrap gap-2" : "space-x-1"
+                  )}>
                     {containerActions[container.id]?.loading ? (
-                      <div className="flex items-center space-x-2 px-3 py-2">
-                        <RefreshCw className="h-4 w-4 animate-spin text-primary-600" />
-                        <span className="text-sm text-primary-600">
-                          {containerActions[container.id].action === 'start' && '启动中...'}
-                          {containerActions[container.id].action === 'stop' && '停止中...'}
-                          {containerActions[container.id].action === 'restart' && '重启中...'}
-                          {containerActions[container.id].action === 'update' && '更新中...'}
+                      <div className="flex items-center space-x-2 px-4 py-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+                        <RefreshCw className="h-4 w-4 animate-spin text-primary-600 dark:text-primary-400" />
+                        <span className="text-sm font-medium text-primary-600 dark:text-primary-400">
+                          {containerActions[container.id].action === 'start' && '启动中'}
+                          {containerActions[container.id].action === 'stop' && '停止中'}
+                          {containerActions[container.id].action === 'restart' && '重启中'}
+                          {containerActions[container.id].action === 'update' && '更新中'}
                         </span>
                       </div>
                     ) : (
@@ -504,43 +781,63 @@ export function Containers() {
                           <>
                             <button
                               onClick={() => handleContainerAction(container.id, 'stop')}
-                              className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                              title="停止"
+                              className={cn(
+                                "group relative text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all duration-200 flex items-center",
+                                viewMode === 'grid' ? "px-2 py-1.5 space-x-1" : "px-3 py-2 space-x-1.5"
+                              )}
+                              title="停止容器"
                             >
                               <Square className="h-4 w-4" />
+                              <span className="text-xs font-medium">停止</span>
                             </button>
                             <button
                               onClick={() => handleContainerAction(container.id, 'restart')}
-                              className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                              title="重启"
+                              className={cn(
+                                "group relative text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-all duration-200 flex items-center",
+                                viewMode === 'grid' ? "px-2 py-1.5 space-x-1" : "px-3 py-2 space-x-1.5"
+                              )}
+                              title="重启容器"
                             >
                               <RotateCcw className="h-4 w-4" />
+                              <span className="text-xs font-medium">重启</span>
                             </button>
                           </>
                         ) : (
                           <button
                             onClick={() => handleContainerAction(container.id, 'start')}
-                            className="p-2 text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                            title="启动"
+                            className={cn(
+                              "group relative text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-all duration-200 flex items-center",
+                              viewMode === 'grid' ? "px-2 py-1.5 space-x-1" : "px-3 py-2 space-x-1.5"
+                            )}
+                            title="启动容器"
                           >
                             <Play className="h-4 w-4" />
+                            <span className="text-xs font-medium">启动</span>
                           </button>
                         )}
-                        
+
                         <button
-                          onClick={() => handleContainerAction(container.id, 'update')}
-                          className="p-2 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                          title="更新"
+                          onClick={() => handleUpdateContainer(container.id)}
+                          className={cn(
+                            "group relative text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-all duration-200 flex items-center",
+                            viewMode === 'grid' ? "px-2 py-1.5 space-x-1" : "px-3 py-2 space-x-1.5"
+                          )}
+                          title="更新容器"
                         >
                           <Upload className="h-4 w-4" />
+                          <span className="text-xs font-medium">更新</span>
                         </button>
-                        
+
                         <button
                           onClick={() => setSelectedContainer(container)}
-                          className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                          title="详情"
+                          className={cn(
+                            "group relative text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 flex items-center",
+                            viewMode === 'grid' ? "px-2 py-1.5 space-x-1" : "px-3 py-2 space-x-1.5"
+                          )}
+                          title="查看详情"
                         >
-                          <Edit3 className="h-4 w-4" />
+                          <Info className="h-4 w-4" />
+                          <span className="text-xs font-medium">详情</span>
                         </button>
                       </>
                     )}
@@ -665,23 +962,72 @@ function ContainerDetailModal({ container, onClose, onRename, onUpdate, onAction
 
   const handleRename = async () => {
     if (name !== container.name) {
-      setIsRenaming(true)
-      await onRename(container.id, name)
-      // 无效化查询以触发重新获取数据
-      await queryClient.invalidateQueries(['containers'])
-      setIsRenaming(false)
+      try {
+        setIsRenaming(true)
+        console.log(`重命名容器: ${container.name} -> ${name}`)
+
+        await onRename(container.id, name)
+
+        // 无效化查询以触发重新获取数据
+        await queryClient.invalidateQueries(['containers'])
+
+        // 更新当前容器状态
+        setCurrentContainer({ ...currentContainer, name: name })
+
+        console.log('✅ 容器重命名成功')
+        setIsRenaming(false)
+      } catch (error) {
+        console.error('重命名失败:', error)
+        setIsRenaming(false)
+      }
     }
   }
 
   const handleSave = async () => {
     // 如果镜像tag发生变化，则更新容器
     if (imageNameAndTag !== container.usingImage) {
-      setIsUpdating(true)
-      // 使用当前容器名称作为新容器名称
-      await onUpdate(container.id, imageNameAndTag, container.name, /* delOldContainer */ false)
-      // 无效化查询以触发重新获取数据
-      await queryClient.invalidateQueries(['containers'])
-      setIsUpdating(false)
+      try {
+        setIsUpdating(true)
+
+        console.log(`开始更新容器镜像: ${container.name}`)
+        console.log(`原镜像: ${container.usingImage}`)
+        console.log(`新镜像: ${imageNameAndTag}`)
+
+        // 直接调用API更新容器
+        const response = await containerAPI.updateContainer(
+          container.id,
+          container.name,
+          imageNameAndTag,
+          true // 删除旧容器
+        )
+
+        console.log('更新容器响应:', response.data)
+
+        if (response.data.code === 200 || response.data.code === 0) {
+          const taskID = response.data.data?.taskID
+
+          if (taskID) {
+            // 如果返回了taskID，关闭弹窗，让用户在列表中看到进度
+            console.log('更新任务已创建，taskID:', taskID)
+            await queryClient.invalidateQueries(['containers'])
+            onClose()
+            console.log('✅ 容器更新任务已启动，请在列表中查看进度')
+          } else {
+            // 没有taskID，更新完成
+            await queryClient.invalidateQueries(['containers'])
+            setImageNameAndTag(imageNameAndTag) // 更新本地状态
+            console.log('✅ 容器镜像更新完成')
+          }
+        } else {
+          throw new Error(response.data.msg || '更新失败')
+        }
+
+        setIsUpdating(false)
+      } catch (error) {
+        console.error('更新容器镜像失败:', error)
+        console.error(`❌ 更新失败: ${error.response?.data?.msg || error.message}`)
+        setIsUpdating(false)
+      }
     }
   }
 
@@ -735,91 +1081,61 @@ function ContainerDetailModal({ container, onClose, onRename, onUpdate, onAction
     )
   }
 
-  // 获取容器图标
+  // 获取容器图标 - 与列表显示逻辑一致
   const getContainerIcon = () => {
-    // 检查是否有自定义图标
-    if (currentContainer.iconUrl) {
-      return (
-        <img 
-          src={currentContainer.iconUrl} 
-          alt={currentContainer.name} 
-          className="h-10 w-10 rounded-lg object-cover"
-          onError={(e) => {
-            // 如果图片加载失败，显示默认图标
-            e.target.onerror = null;
-            e.target.style.display = 'none';
-            e.target.insertAdjacentHTML('afterend', `
-              <div class="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Package class="h-6 w-6 text-white" />
-              </div>
-            `);
-          }}
-        />
-      );
-    }
-    
-    // 查找匹配的镜像图标
+    // 获取镜像logo数据
     const imageLogos = JSON.parse(localStorage.getItem('docker_copilot_image_logos') || '{}');
-    if (imageLogos && typeof imageLogos === 'object' && currentContainer.usingImage) {
-      // 使用完整的镜像名称和标签进行匹配
-      const imageFullName = currentContainer.usingImage;
-      
-      // 首先尝试精确匹配（包含tag）
-      if (imageLogos[imageFullName]) {
-        return (
-          <img 
-            src={imageLogos[imageFullName]} 
-            alt={currentContainer.name} 
-            className="h-10 w-10 rounded-lg object-cover"
-            onError={(e) => {
-              // 如果图片加载失败，回退到默认图标
-              e.target.onerror = null;
-              e.target.style.display = 'none';
-              e.target.insertAdjacentHTML('afterend', `
-                <div class="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Package class="h-6 w-6 text-white" />
-                </div>
-              `);
-            }}
-          />
-        );
+    let iconUrl = currentContainer.iconUrl;
+
+    // 如果容器没有自定义图标，则查找镜像图标
+    if (!iconUrl && currentContainer.usingImage) {
+      // 首先尝试使用内置logo配置
+      const builtInLogo = getImageLogo(currentContainer.usingImage, imageLogos);
+      if (builtInLogo) {
+        iconUrl = builtInLogo;
       } else {
-        // 如果精确匹配失败，尝试镜像名称匹配（不包含tag部分）
-        const imageName = currentContainer.usingImage.split(':')[0];
-        
-        // 遍历所有镜像图标，查找匹配的镜像名称
-        for (const [imageId, logoUrl] of Object.entries(imageLogos)) {
-          // 检查镜像名称是否匹配（不包含tag部分）
-          const logoImageName = imageId.split(':')[0];
-          if (imageName === logoImageName) {
-            return (
-              <img 
-                src={logoUrl} 
-                alt={currentContainer.name} 
-                className="h-10 w-10 rounded-lg object-cover"
-                onError={(e) => {
-                  // 如果图片加载失败，回退到默认图标
-                  e.target.onerror = null;
-                  e.target.style.display = 'none';
-                  e.target.insertAdjacentHTML('afterend', `
-                    <div class="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                      <Package class="h-6 w-6 text-white" />
-                    </div>
-                  `);
-                }}
-              />
-            );
+        // 如果没有内置logo，则使用匹配逻辑
+        for (const [imageName, logoUrl] of Object.entries(imageLogos)) {
+          if (currentContainer.usingImage.startsWith(imageName) || 
+              currentContainer.usingImage.includes(`${imageName}:`)) {
+            iconUrl = logoUrl;
+            break;
           }
         }
       }
     }
-    
-    // 默认图标
-    return (
-      <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-        <Package className="h-6 w-6 text-white" />
-      </div>
-    );
+
+    // 根据图标URL显示相应内容
+    if (iconUrl) {
+      return (
+        <img 
+          src={iconUrl} 
+          alt={currentContainer.name} 
+          className="h-10 w-10 rounded-lg object-cover"
+          onError={(e) => {
+            e.target.style.display = 'none';
+            const parent = e.target.parentElement;
+            if (parent) {
+              parent.innerHTML = `
+                <div class="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6 text-white">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                  </svg>
+                </div>
+              `;
+            }
+          }}
+        />
+      );
+    } else {
+      return (
+        <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+          <Package className="h-6 w-6 text-white" />
+        </div>
+      );
+    }
   };
 
   return (
@@ -971,16 +1287,26 @@ function ContainerDetailModal({ container, onClose, onRename, onUpdate, onAction
               />
               <button
                 onClick={handleSave}
-                disabled={isUpdating || imageNameAndTag === container.usingImage}
-                className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                  isUpdating || imageNameAndTag === container.usingImage
+                disabled={isUpdating || imageNameAndTag === container.usingImage || !imageNameAndTag.trim()}
+                className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center ${
+                  isUpdating || imageNameAndTag === container.usingImage || !imageNameAndTag.trim()
                     ? 'bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400'
                     : 'bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600'
                 }`}
               >
-                {isUpdating ? '更新中...' : '更新'}
+                {isUpdating ? (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                    更新中
+                  </>
+                ) : (
+                  '更换镜像'
+                )}
               </button>
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              修改镜像后点击"更换镜像"按钮将重新创建容器
+            </p>
           </div>
           
         </div>

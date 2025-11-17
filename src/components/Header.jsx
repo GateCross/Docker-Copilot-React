@@ -14,6 +14,8 @@ import {
 import { ThemeToggle } from './ThemeToggle.jsx'
 import { cn } from '../utils/cn.js'
 import { LOGO_CONFIG } from '../assets/logo.js'
+import { useQuery } from '@tanstack/react-query'
+import { versionAPI } from '../api/client.js'
 
 export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false, onToggleCollapse }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
@@ -28,6 +30,33 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
       setInternalCollapsed(!internalCollapsed)
     }
   }
+
+  // 查询版本信息
+  const { data: versionData } = useQuery({
+    queryKey: ['version'],
+    queryFn: async () => {
+      try {
+        const response = await versionAPI.getVersion()
+        console.log('版本信息响应:', response.data)
+        if (response.data.code === 200 || response.data.code === 0) {
+          // 支持多种响应格式
+          const data = response.data.data
+          if (typeof data === 'string') {
+            return { version: data }
+          } else if (data && typeof data === 'object') {
+            return data
+          }
+          return response.data
+        }
+        return null
+      } catch (error) {
+        console.error('获取版本信息失败:', error)
+        return null
+      }
+    },
+    refetchInterval: 60000, // 每分钟刷新一次
+    refetchOnWindowFocus: false,
+  })
 
   const navItems = [
     {
@@ -49,12 +78,7 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
       id: '#icons',
       label: '图标',
       icon: Palette,
-    },
-    {
-      id: '#settings',
-      label: '设置',
-      icon: Settings,
-    },
+    },    
   ]
 
   return (
@@ -86,11 +110,17 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
         <div className="flex flex-col h-full">
           {/* 头部 */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between w-full">
+            <div className={cn(
+              "flex items-center w-full",
+              sidebarCollapsed ? "justify-center" : "justify-between"
+            )}>
               {/* Logo区域 - 点击可收起/展开 */}
               <button
                 onClick={handleToggleCollapse}
-                className="flex items-center space-x-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg p-2 -m-2 transition-colors cursor-pointer group"
+                className={cn(
+                  "flex items-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer group",
+                  sidebarCollapsed ? "p-2" : "space-x-3 p-2 -m-2"
+                )}
                 title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
               >
                 <div className="flex-shrink-0">
@@ -106,14 +136,16 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
                   </div>
                 )}
               </button>
-              
+
               {/* 移动端关闭按钮 */}
-              <button
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="lg:hidden p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              {!sidebarCollapsed && (
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="lg:hidden p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -181,7 +213,7 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
             </div>
             {!sidebarCollapsed && (
               <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
-                <p>Docker Copilot v1.0</p>
+                <p>Docker Copilot {versionData?.version || 'v1.0'}</p>
               </div>
             )}
           </div>

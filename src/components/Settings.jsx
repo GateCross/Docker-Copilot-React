@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Settings as SettingsIcon, RefreshCw, Download, Server, Key, Bell } from 'lucide-react'
 import { versionAPI } from '../api/client.js'
 import { cn } from '../utils/cn.js'
@@ -8,23 +8,62 @@ export function Settings() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [apiKey, setApiKey] = useState('')
 
+  // 组件加载时获取本地版本
+  useEffect(() => {
+    fetchVersionInfo('local')
+  }, [])
+
   const fetchVersionInfo = async (type) => {
     try {
       const response = await versionAPI.getVersion(type)
-      return response.data
+      console.log(`获取${type}版本响应:`, response.data)
+
+      // 处理响应数据 - 兼容多种返回格式
+      if (response.data.code === 200 || response.data.code === 0) {
+        // 优先使用data字段,其次使用msg字段
+        let versionData = response.data.data || response.data.msg || ''
+
+        // 如果data是对象,尝试提取version字段
+        if (typeof versionData === 'object') {
+          versionData = versionData.version || JSON.stringify(versionData)
+        }
+
+        setVersionInfo(prev => ({ 
+          ...prev, 
+          [type]: String(versionData)
+        }))
+      } else {
+        console.error('获取版本信息失败:', response.data.msg)
+        setVersionInfo(prev => ({ 
+          ...prev, 
+          [type]: '获取失败' 
+        }))
+      }
     } catch (error) {
       console.error('获取版本信息失败:', error)
-      return ''
+      setVersionInfo(prev => ({ 
+        ...prev, 
+        [type]: '获取失败' 
+      }))
     }
   }
 
   const handleUpdateProgram = async () => {
     try {
       setIsUpdating(true)
-      await versionAPI.updateProgram()
-      // 可以添加成功提示
+      const response = await versionAPI.updateProgram()
+      if (response.data.code === 200 || response.data.code === 0) {
+        alert('程序更新成功！')
+        // 更新成功后重新获取版本信息
+        setTimeout(() => {
+          fetchVersionInfo('local')
+        }, 1000)
+      } else {
+        alert(`更新失败: ${response.data.msg}`)
+      }
     } catch (error) {
       console.error('更新程序失败:', error)
+      alert(`更新程序失败: ${error.response?.data?.msg || error.message}`)
     } finally {
       setIsUpdating(false)
     }
@@ -87,7 +126,7 @@ export function Settings() {
                     readOnly
                   />
                   <button
-                    onClick={() => fetchVersionInfo('local').then(data => setVersionInfo(prev => ({ ...prev, local: data })))}
+                    onClick={() => fetchVersionInfo('local')}
                     className="btn-secondary"
                   >
                     获取
@@ -108,7 +147,7 @@ export function Settings() {
                     readOnly
                   />
                   <button
-                    onClick={() => fetchVersionInfo('remote').then(data => setVersionInfo(prev => ({ ...prev, remote: data })))}
+                    onClick={() => fetchVersionInfo('remote')}
                     className="btn-secondary"
                   >
                     获取
@@ -126,12 +165,12 @@ export function Settings() {
               )}
             >
               {isUpdating ? (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-center space-x-2">
                   <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span>更新中...</span>
                 </div>
               ) : (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-center space-x-2">
                   <Download className="h-4 w-4" />
                   <span>更新程序</span>
                 </div>
