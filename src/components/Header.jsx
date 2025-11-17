@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle.jsx'
 import { cn } from '../utils/cn.js'
+import { LOGO_CONFIG } from '../assets/logo.js'
 
 export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false, onToggleCollapse }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
@@ -88,9 +89,9 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
           {/* 头部 */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Box className="h-6 w-6 text-white" />
-              </div>
+              <img 
+                {...LOGO_CONFIG}
+              />
               {!sidebarCollapsed && (
                 <div className="transition-opacity duration-300">
                   <h1 className="text-xl font-bold text-gray-900 dark:text-white">Docker Copilot</h1>

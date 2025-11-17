@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Key, LogIn, Eye, EyeOff } from 'lucide-react'
 import { authAPI } from '../api/client.js'
 import { cn } from '../utils/cn.js'
+import { LOGO_CONFIG } from '../assets/logo.js'
 
 export function Auth({ onLogin }) {
   const [secretKey, setSecretKey] = useState('')
@@ -42,8 +43,11 @@ export function Auth({ onLogin }) {
       <div className="max-w-md w-full space-y-8">
         {/* 头部 */}
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-primary-600 rounded-2xl flex items-center justify-center mb-4">
-            <Key className="h-8 w-8 text-white" />
+          <div className="flex justify-center mb-4">
+            <img 
+              {...LOGO_CONFIG}
+              className="h-32 w-32 rounded-2xl object-cover"
+            />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Docker Copilot</h2>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
