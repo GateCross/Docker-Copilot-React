@@ -7,7 +7,6 @@ import {
   X,
   Server,
   Image,
-  Settings,
   DatabaseBackup,
   Palette
 } from 'lucide-react'
