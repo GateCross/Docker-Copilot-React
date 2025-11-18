@@ -47,14 +47,49 @@ if [ ! -f "${DIST_DIR}/index.html" ]; then
   exit 1
 fi
 
+# 初始化配置目录
+init_config_dir() {
+  local host_config_dir="$1"
+  local image_config_dir="$2"
+  
+  # 检查宿主机挂载的目录是否存在
+  if [ ! -d "$host_config_dir" ]; then
+    echo "⚠ Warning: Host config directory $host_config_dir not found"
+    return 0
+  fi
+  
+  # 检查宿主机目录是否为空
+  if [ -z "$(ls -A "$host_config_dir")" ]; then
+    echo "✓ Host config directory is empty, initializing with image config files..."
+    
+    # 复制镜像中的配置文件到宿主机目录
+    if [ -d "$image_config_dir" ]; then
+      echo "  Copying config files from image to host directory..."
+      cp -r "$image_config_dir"/* "$host_config_dir"/
+      echo "✓ Config files copied successfully"
+    else
+      echo "⚠ Warning: Image config directory $image_config_dir not found"
+    fi
+  else
+    echo "✓ Host config directory already contains files, skipping initialization"
+  fi
+}
+
+# 在 Docker 模式下初始化配置目录
+if [ "$START_SERVER" = "true" ]; then
+  # 检查是否挂载了宿主机目录（通过检查目录是否可写）
+  if [ -w "/app/src" ]; then
+    init_config_dir "/app/src/config" "/app/src/config"
+  fi
+fi
+
 # 检查配置目录
 if [ ! -d "$CONFIG_DIR" ]; then
-  echo "⚠ Warning: Config directory $CONFIG_DIR not found, creating it"
-  mkdir -p "$CONFIG_DIR"
+  echo "⚠ Warning: Config directory $CONFIG_DIR not found"
 fi
 
 # 检查配置目录中的图片目录
-if [ ! -d "$CONFIG_DIR/image" ]; then
+if [ -d "$CONFIG_DIR" ] && [ ! -d "$CONFIG_DIR/image" ]; then
   echo "⚠ Warning: Image directory $CONFIG_DIR/image not found"
 fi
 

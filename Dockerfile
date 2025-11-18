@@ -36,9 +36,6 @@ COPY --from=builder /app/src/config ./src/config
 COPY docker-config.sh /app/docker-config.sh
 RUN chmod +x /app/docker-config.sh
 
-# 创建配置目录
-RUN mkdir -p /app/src/config/image
-
 # 暴露端口
 EXPOSE 12713
 

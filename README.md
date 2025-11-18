@@ -253,6 +253,7 @@ docker-compose up -d
 
 ```
 DCF/
+├── imageLogos.js (可选的自定义配置文件)
 └── image/
     ├── 146.png
     ├── 132.png
@@ -267,6 +268,12 @@ DCF/
     ├── 100.png
     └── 4.png
 ```
+
+## 自动初始化配置目录
+
+当您首次启动容器时，如果宿主机挂载的目录（如 `/vol1/1000/DSpace/DockerCopilot/DCF`）为空，容器会自动将镜像中内置的配置文件复制到该目录中。
+
+这意味着您不需要手动复制配置文件，容器会自动完成初始化过程。
 
 ## 配置文件
 
@@ -296,4 +303,11 @@ export const customImageLogos = {
 3. 确保配置文件目录包含所需的图片文件，可以从项目源码中复制：
    ```bash
    cp -r src/config/image /vol1/1000/DSpace/DockerCopilot/DCF/
+   ```
+
+4. 确保使用读写模式（`:rw`）而不是只读模式（`:ro`）挂载卷，否则容器将无法访问配置文件
+
+5. 如果自动初始化失败，请检查容器日志：
+   ```bash
+   docker logs dcf
    ```
