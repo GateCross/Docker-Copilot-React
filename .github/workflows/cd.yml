@@ -36,7 +36,6 @@ jobs:
           images: docker.io/${{ secrets.DOCKER_HUB_USERNAME }}/docker-copilot-frontend
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=dev,enable={{branch==dev}}
             type=ref,event=branch
             type=sha,prefix={{branch}}-
 
