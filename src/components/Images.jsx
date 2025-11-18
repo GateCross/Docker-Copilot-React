@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { HardDrive, Trash, Trash2, Calendar, Download, RefreshCw, Link, BrushCleaning, List, ImageIcon } from 'lucide-react'
+import { HardDrive, Trash, Trash2, Calendar, Download, RefreshCw, Link, BrushCleaning, List, Grid } from 'lucide-react'
 import { imageAPI } from '../api/client.js'
 import { cn } from '../utils/cn.js'
 import { getImageLogo } from '../config/imageLogos.js'
@@ -317,7 +317,7 @@ export function Images() {
                   )}
                   title="网格视图"
                 >
-                  <ImageIcon className="h-4 w-4" />
+                  <Grid className="h-4 w-4" />
                 </button>
               </div>
               <button 

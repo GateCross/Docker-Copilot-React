@@ -495,15 +495,21 @@ export function Containers() {
         {/* 批量操作按钮区域 */}
         {!isBatchMode ? (
           <div className="flex items-center space-x-3">
+            <button 
+              className="btn-secondary"
+              onClick={() => setIsBatchMode(true)}
+            >
+              批量操作
+            </button>
             {/* 视图切换按钮 */}
-            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <div className="flex border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
               <button
                 onClick={() => toggleViewMode('list')}
                 className={cn(
-                  "p-2 rounded-md transition-colors",
+                  "px-3 py-2 text-sm",
                   viewMode === 'list'
-                    ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                    ? "bg-primary-600 text-white"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                 )}
                 title="列表视图"
               >
@@ -512,22 +518,16 @@ export function Containers() {
               <button
                 onClick={() => toggleViewMode('grid')}
                 className={cn(
-                  "p-2 rounded-md transition-colors",
+                  "px-3 py-2 text-sm",
                   viewMode === 'grid'
-                    ? "bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                    ? "bg-primary-600 text-white"
+                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                 )}
                 title="网格视图"
               >
                 <Grid className="h-4 w-4" />
               </button>
             </div>
-            <button 
-              className="btn-secondary"
-              onClick={() => setIsBatchMode(true)}
-            >
-              批量操作
-            </button>
             <button 
               className="btn-primary"
               onClick={() => refetch()}
@@ -762,7 +762,7 @@ export function Containers() {
                 "flex items-center flex-shrink-0",
                 viewMode === 'grid' 
                   ? "flex-col gap-3 pt-3 border-t border-gray-200 dark:border-gray-700 w-full"
-                  : "gap-3 flex-col md:flex-row md:items-center"
+                  : "gap-2 flex-row items-center"
               )}>
                 {/* 状态徽章 */}
                 {viewMode === 'list' && (
@@ -780,7 +780,7 @@ export function Containers() {
                 {!isBatchMode && (
                   <div className={cn(
                     "flex items-center flex-shrink-0",
-                    viewMode === 'grid' ? "flex-wrap gap-2 w-full" : "gap-1 flex-wrap"
+                    viewMode === 'grid' ? "flex-wrap gap-2 w-full" : "gap-1 flex-row"
                   )}>
                     {containerActions[container.id]?.loading ? (
                       <div className="flex items-center space-x-2 px-4 py-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
