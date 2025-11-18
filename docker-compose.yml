@@ -1,16 +1,17 @@
 version: '3.8'
 
 services:
-  dockercopilot:
+  # 后端服务 - Docker Copilot API
+  backend:
     image: 0nlylty/dockercopilot:latest
-    container_name: DockerCopilot
+    container_name: docker-copilot-backend
     restart: always
     privileged: true
     ports:
       - "12712:12712"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /vol1/1000/DSpace/DockerCopilot/Data:/data
+      - docker-copilot-data:/data
     environment:
       - TZ=Asia/Shanghai
       - DOCKER_HOST=unix:///var/run/docker.sock
@@ -24,10 +25,14 @@ services:
       retries: 3
       start_period: 10s
 
-  docker-copilot-frontend:
+  # 前端服务 - Docker Copilot Frontend
+  frontend:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # 构建时注入 API 地址
+        VITE_API_BASE_URL: http://backend:12712
     image: dongshull/docker-copilot-frontend:latest
     container_name: docker-copilot-frontend
     restart: always
@@ -35,15 +40,14 @@ services:
       - "12713:12713"
     environment:
       - NODE_ENV=production
-      # 后端 API 地址 - 使用容器名称（同一网络内）
-      - VITE_API_BASE_URL=http://dockercopilot:12712
+      # 运行时也设置环境变量（备份方案）
+      - VITE_API_BASE_URL=http://backend:12712
     volumes:
-      # 确保目录存在，否则会报错
-      - /vol1/1000/DSpace/DockerCopilot/DCF:/app/dist/config
+      - docker-copilot-config:/app/dist/config
     networks:
       - docker-copilot-network
     depends_on:
-      dockercopilot:
+      backend:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:12713/"]
@@ -52,6 +56,14 @@ services:
       retries: 3
       start_period: 5s
 
+# 网络配置
 networks:
   docker-copilot-network:
     driver: bridge
+
+# 数据卷配置
+volumes:
+  docker-copilot-data:
+    driver: local
+  docker-copilot-config:
+    driver: local
