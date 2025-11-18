@@ -15,10 +15,34 @@ import { cn } from '../utils/cn.js'
 import { LOGO_CONFIG } from '../assets/logo.js'
 import { useQuery } from '@tanstack/react-query'
 import { versionAPI } from '../api/client.js'
+import { version as FRONTEND_VERSION } from '../../package.json'
 
 export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false, onToggleCollapse }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
   const [internalCollapsed, setInternalCollapsed] = React.useState(false)
+  
+  // 时间格式转换函数 - 将UTC时间转换为北京时间
+  const formatBuildDate = (dateString) => {
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return dateString
+      }
+      // 转换为北京时间 (UTC+8)
+      const beijingDate = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+      return beijingDate.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).replace(/\//g, '-')
+    } catch (error) {
+      return dateString
+    }
+  }
   
   // 使用外部传入的收起状态，如果没有则使用内部状态
   const sidebarCollapsed = onToggleCollapse ? isCollapsed : internalCollapsed
@@ -35,22 +59,59 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
     queryKey: ['version'],
     queryFn: async () => {
       try {
-        const response = await versionAPI.getVersion()
-        console.log('版本信息响应:', response.data)
-        if (response.data.code === 200 || response.data.code === 0) {
-          // 支持多种响应格式
-          const data = response.data.data
-          if (typeof data === 'string') {
-            return { version: data }
-          } else if (data && typeof data === 'object') {
-            return data
+        // 获取本地版本信息
+        const localResponse = await versionAPI.getVersion('local')
+        console.log('本地版本信息响应:', localResponse.data)
+        
+        let localVersion = 'unknown'
+        let buildDate = ''
+        
+        if (localResponse.data.code === 200 || localResponse.data.code === 0) {
+          const localData = localResponse.data.data
+          if (localData && typeof localData === 'object') {
+            localVersion = localData.version || 'unknown'
+            buildDate = localData.buildDate || ''
+          } else if (typeof localData === 'string') {
+            localVersion = localData
           }
-          return response.data
         }
-        return null
+        
+        // 获取远端版本信息
+        let remoteVersion = 'unknown'
+        let hasUpdate = false
+        try {
+          const remoteResponse = await versionAPI.getVersion('remote')
+          console.log('远端版本信息响应:', remoteResponse.data)
+          
+          if (remoteResponse.data.code === 200 || remoteResponse.data.code === 0) {
+            const remoteData = remoteResponse.data.data
+            if (remoteData && typeof remoteData === 'object') {
+              remoteVersion = remoteData.remoteVersion || 'unknown'
+            } else if (typeof remoteData === 'string') {
+              remoteVersion = remoteData
+            }
+            
+            // 对比版本号，判断是否有更新
+            hasUpdate = remoteVersion !== localVersion && remoteVersion !== 'unknown'
+          }
+        } catch (error) {
+          console.warn('获取远端版本信息失败:', error)
+        }
+        
+        return {
+          version: localVersion,
+          buildDate,
+          remoteVersion,
+          hasUpdate
+        }
       } catch (error) {
         console.error('获取版本信息失败:', error)
-        return null
+        return { 
+          version: 'unknown', 
+          buildDate: '',
+          remoteVersion: 'unknown',
+          hasUpdate: false
+        }
       }
     },
     refetchInterval: 60000, // 每分钟刷新一次
@@ -211,8 +272,18 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
               </button>
             </div>
             {!sidebarCollapsed && (
-              <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
-                <p>Docker Copilot {versionData?.version || 'v1.0'}</p>
+              <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4 space-y-1">
+                <p className="font-medium text-gray-700 dark:text-gray-300">Docker Copilot</p>
+                <p>前端版本：{FRONTEND_VERSION}</p>
+                <p className={cn(
+                  versionData?.hasUpdate ? 'text-yellow-600 dark:text-yellow-400 font-medium' : ''
+                )}>
+                  后端版本：{versionData?.version || 'v1.0'}
+                  {versionData?.hasUpdate && ' (有更新)'}
+                </p>
+                {versionData?.buildDate && (
+                  <p className="text-gray-400 dark:text-gray-500">构建时间：{formatBuildDate(versionData.buildDate)}</p>
+                )}
               </div>
             )}
           </div>
