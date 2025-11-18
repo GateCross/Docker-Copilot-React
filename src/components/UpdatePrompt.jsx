@@ -9,16 +9,12 @@ import { cn } from '../utils/cn.js'
 export function UpdatePrompt({
   isVisible,
   onClose,
-  frontendVersion,
   backendVersion,
   remoteVersion,
   hasBackendUpdate,
-  onRefresh,
   onUpdateBackend,
   isUpdating = false
 }) {
-  const [activeTab, setActiveTab] = useState('info') // 'info' 或 'changelog'
-
   if (!isVisible) return null
 
   return (
@@ -52,13 +48,6 @@ export function UpdatePrompt({
           <div className="px-6 py-4">
             {/* 版本信息 */}
             <div className="space-y-3 mb-6">
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800/50 rounded-lg">
-                <span className="text-sm text-gray-600 dark:text-gray-400">前端版本</span>
-                <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {frontendVersion} → {frontendVersion}
-                </span>
-              </div>
-
               {hasBackendUpdate && (
                 <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-700/50">
                   <span className="text-sm text-gray-600 dark:text-gray-400">后端版本</span>
@@ -115,13 +104,7 @@ export function UpdatePrompt({
               </button>
             )}
 
-            <button
-              onClick={onRefresh}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg active:scale-95 transition-all font-medium"
-            >
-              <RefreshCw className="h-4 w-4" />
-              刷新
-            </button>
+
           </div>
         </div>
       </div>

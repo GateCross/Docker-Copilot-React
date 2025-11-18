@@ -16,7 +16,6 @@ import { UpdatePrompt } from './UpdatePrompt.jsx'
 import { cn } from '../utils/cn.js'
 import { LOGO_CONFIG } from '../assets/logo.js'
 import { useVersionCheck } from '../hooks/useVersionCheck.js'
-import { VERSION_CONFIG, formatBuildTime } from '../config/version.js'
 
 export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false, onToggleCollapse }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
@@ -24,27 +23,39 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
   
   // 时间格式转换函数 - 将UTC时间转换为北京时间
   const formatVersionBuildDate = (dateString) => {
-    return formatBuildTime(dateString)
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return dateString
+      }
+      
+      // 转换为北京时间 (UTC+8)
+      const beijingDate = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+      
+      return beijingDate.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).replace(/\//g, '-')
+    } catch (error) {
+      return dateString
+    }
   }
   
   // 使用版本检查 Hook
   const {
-    updateAvailable,
     showUpdatePrompt,
     setShowUpdatePrompt,
-    frontendVersion,
-    frontendHasUpdate,
-    latestFrontendVersion,
     backendVersion,
     remoteVersion,
     buildDate,
-    buildTime,
-    buildEnv,
     hasBackendUpdate,
-    refreshPage,
     updateBackend,
-    checkForUpdates,
-    openGithubRelease
+    checkForUpdates
   } = useVersionCheck()
 
   // 使用外部传入的收起状态，如果没有则使用内部状态
@@ -215,27 +226,6 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
                 {/* 版本信息卡片 */}
                 <div className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20 rounded-lg p-3 border border-primary-200 dark:border-primary-700/50">
                   <div className="space-y-2">
-                    {/* 前端版本 */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">前端</span>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-semibold text-primary-600 dark:text-primary-400 bg-white dark:bg-primary-900/30 px-2 py-0.5 rounded cursor-pointer hover:shadow-md transition-all" title="点击检查更新" onClick={() => checkForUpdates()}>
-                          {frontendVersion}
-                        </span>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
-                          {buildEnv === 'development' ? '开发' : '生产'}
-                        </span>
-                        {frontendHasUpdate && (
-                          <button
-                            onClick={() => openGithubRelease()}
-                            className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded animate-pulse hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors cursor-pointer"
-                            title={`点击查看 v${latestFrontendVersion} 更新`}>
-                            更新 →
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
                     {/* 后端版本 */}
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-gray-600 dark:text-gray-400">后端</span>
@@ -248,7 +238,7 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
                         )}
                         onClick={() => checkForUpdates()}
                         title="点击检查更新">
-                          {backendVersion || 'v1.0'}
+                          {backendVersion || '获取中...'}
                         </span>
                         {hasBackendUpdate && (
                           <button
@@ -261,20 +251,11 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
                       </div>
                     </div>
 
-                    {/* 构建时间 */}
-                    {buildTime && (
-                      <div className="pt-2 border-t border-primary-200 dark:border-primary-700/50">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          构建：{formatVersionBuildDate(buildTime)}
-                        </p>
-                      </div>
-                    )}
-
                     {/* 后端构建时间 */}
                     {buildDate && (
-                      <div>
+                      <div className="pt-2 border-t border-primary-200 dark:border-primary-700/50">
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          后端：{formatVersionBuildDate(buildDate)}
+                          构建：{formatVersionBuildDate(buildDate)}
                         </p>
                       </div>
                     )}
@@ -290,11 +271,9 @@ export function Sidebar({ activeTab, onTabChange, onLogout, isCollapsed = false,
       <UpdatePrompt
         isVisible={showUpdatePrompt}
         onClose={() => setShowUpdatePrompt(false)}
-        frontendVersion={frontendVersion}
         backendVersion={backendVersion}
         remoteVersion={remoteVersion}
         hasBackendUpdate={hasBackendUpdate}
-        onRefresh={refreshPage}
         onUpdateBackend={updateBackend}
       />
     </>
