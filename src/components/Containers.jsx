@@ -9,9 +9,7 @@ import {
   Calendar,
   Package,
   X,
-  Info,
-  List,
-  Grid
+  Info
 } from 'lucide-react'
 import { containerAPI, progressAPI } from '../api/client.js'
 import { cn } from '../utils/cn.js'
@@ -27,10 +25,7 @@ export function Containers() {
   // 添加操作状态跟踪
   const [containerActions, setContainerActions] = useState({}) // 跟踪每个容器的操作状态
   const [updateTasks, setUpdateTasks] = useState({}) // 跟踪更新任务
-  // 添加视图模式状态
-  const [viewMode, setViewMode] = useState(() => {
-    return localStorage.getItem('containerViewMode') || 'list'
-  })
+
   // 自定义确认弹窗状态
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
@@ -41,11 +36,7 @@ export function Containers() {
     type: 'info' // info, warning, danger
   })
 
-  // 切换视图模式
-  const toggleViewMode = (mode) => {
-    setViewMode(mode)
-    localStorage.setItem('containerViewMode', mode)
-  }
+
 
   // 使用React Query获取容器列表
   const { data: containers = [], isLoading, refetch } = useQuery({
@@ -644,33 +635,7 @@ export function Containers() {
             >
               批量操作
             </button>
-            {/* 视图切换按钮 */}
-            <div className="flex border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
-              <button
-                onClick={() => toggleViewMode('list')}
-                className={cn(
-                  "px-3 py-2 text-sm",
-                  viewMode === 'list'
-                    ? "bg-primary-600 text-white"
-                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                )}
-                title="列表视图"
-              >
-                <List className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => toggleViewMode('grid')}
-                className={cn(
-                  "px-3 py-2 text-sm",
-                  viewMode === 'grid'
-                    ? "bg-primary-600 text-white"
-                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                )}
-                title="网格视图"
-              >
-                <Grid className="h-4 w-4" />
-              </button>
-            </div>
+
             <button 
               className="btn-primary"
               onClick={() => refetch()}
@@ -733,16 +698,9 @@ export function Containers() {
       </div>
 
       {/* 容器列表 */}
-      <div className={cn(
-        viewMode === 'grid' 
-          ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" 
-          : "space-y-4"
-      )}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {containers.map((container) => (
-          <div key={container.id} className={cn(
-            "card relative overflow-hidden group transition-all duration-200 hover:shadow-lg border border-gray-200 dark:border-gray-700 rounded-2xl",
-            viewMode === 'grid' ? "p-6" : "p-6"
-          )}>
+          <div key={container.id} className="card relative overflow-hidden group transition-all duration-200 hover:shadow-lg border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
             {/* 背景进度条 */}
             {containerActions[container.id]?.loading && containerActions[container.id]?.action === 'update' && (
               <div className="absolute inset-0 pointer-events-none rounded-2xl overflow-hidden">
@@ -766,17 +724,9 @@ export function Containers() {
                 </div>
               </div>
             )}
-            <div className={cn(
-              "relative z-10",
-              viewMode === 'grid' 
-                ? "flex flex-col space-y-4" 
-                : "flex items-center justify-between gap-4"
-            )}>
+            <div className="relative z-10 flex items-center justify-between gap-4">
               {/* 左侧：选择框和图标 */}
-              <div className={cn(
-                "flex items-start",
-                viewMode === 'grid' ? "space-x-4" : "space-x-4"
-              )}>
+              <div className="flex items-start space-x-4">
                 {isBatchMode && (
                   <div className="flex-shrink-0 mt-1.5">
                     <input
@@ -787,6 +737,8 @@ export function Containers() {
                     />
                   </div>
                 )}
+                
+                {/* 图标和状态指示器 */}
                 <div className="flex items-start space-x-3">
                   <div className="flex-shrink-0">
                     {(() => {
@@ -846,7 +798,7 @@ export function Containers() {
                   </div>
                   
                   {/* 状态指示器竖线 */}
-                  <div className="flex flex-col items-center h-full pt-1">
+                  <div className="flex flex-col items-center justify-center h-full">
                     <div className={cn(
                       "w-1 h-14 rounded-full",
                       getStatusIndicatorColor(container.status)
@@ -855,17 +807,12 @@ export function Containers() {
                 </div>
               </div>
                 
-                {/* 中间：容器信息（垂直排列在列表视图） */}
-                <div className={cn(
-                  "flex-1 min-w-0",
-                  viewMode === 'grid' ? "flex flex-col space-y-3" : "flex flex-col justify-center gap-1.5"
-                )}>
+              {/* 中间：容器信息 */}
+              <div className="flex-1 min-w-0 flex items-start gap-4">
+                <div className="flex flex-col justify-center gap-1.5 text-left">
                   <div className="flex items-center gap-2">
                     <h3 
-                      className={cn(
-                        "font-semibold text-gray-900 dark:text-white truncate cursor-pointer hover:underline",
-                        viewMode === 'grid' ? "text-lg" : "text-lg"
-                      )}
+                      className="font-semibold text-gray-900 dark:text-white truncate cursor-pointer hover:underline text-lg"
                       onClick={() => setSelectedContainer(container)}
                     >
                       {container.name}
@@ -875,18 +822,20 @@ export function Containers() {
                     )}
                   </div>
                   
-                  <p className={cn(
-                    "text-gray-500 dark:text-gray-400 truncate",
-                    viewMode === 'grid' ? "text-sm" : "text-sm"
-                  )}>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                     {container.usingImage}
                   </p>
                   
-                  {viewMode === 'list' && container.status === 'running' && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                    <Calendar className="h-3 w-3" />
+                    <span>创建: {new Date(container.createTime).toLocaleDateString()}</span>
+                  </div>
+                  
+                  {container.status === 'running' && (
+                    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                       <Clock className="h-3 w-3" />
-                      <span>{container.runningTime}</span>
-                    </p>
+                      <span>运行: {container.runningTime}</span>
+                    </div>
                   )}
                   
                   {containerActions[container.id]?.loading && containerActions[container.id]?.progress && (
@@ -895,42 +844,17 @@ export function Containers() {
                       <span>{containerActions[container.id].progress}</span>
                     </p>
                   )}
-                  
-                  {viewMode === 'grid' && (
-                    <div className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        <span>创建: {new Date(container.createTime).toLocaleDateString()}</span>
-                      </div>
-                      {container.status === 'running' && (
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>运行: {container.runningTime}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
+              </div>
 
               {/* 右侧：状态和操作按钮 */}
-              <div className={cn(
-                "flex items-start flex-shrink-0",
-                viewMode === 'grid' 
-                  ? "flex-col gap-3 pt-2 border-t border-gray-200 dark:border-gray-700 w-full" 
-                  : "gap-2 flex-row"
-              )}>
-
+              <div className="flex items-start flex-shrink-0 gap-2 flex-row">
                 
                 {/* 操作按钮 */}
                 {!isBatchMode && (
-                  <div className={cn(
-                    "flex items-center flex-shrink-0 transition-all duration-200",
-                    viewMode === 'grid' 
-                      ? "flex-wrap gap-2 w-full justify-center" 
-                      : "gap-1.5 flex-row opacity-0 group-hover:opacity-100"
-                  )}>
+                  <div className="grid grid-cols-2 gap-2">
                     {containerActions[container.id]?.loading ? (
-                      <div className="flex items-center space-x-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+                      <div className="col-span-2 flex items-center justify-center space-x-2 px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
                         <RefreshCw className="h-4 w-4 animate-spin text-primary-600 dark:text-primary-400" />
                         <span className="text-sm font-medium text-primary-600 dark:text-primary-400">
                           {containerActions[container.id].action === 'start' && '启动中'}
@@ -945,63 +869,48 @@ export function Containers() {
                           <>
                             <button
                               onClick={() => handleContainerAction(container.id, 'stop')}
-                              className={cn(
-                                "group relative text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-xl transition-all duration-200 flex items-center shadow-sm hover:shadow",
-                                viewMode === 'grid' ? "px-4 py-2.5 space-x-1.5" : "px-3 py-2 space-x-1"
-                              )}
+                              className="group relative text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-xl transition-all duration-200 flex items-center shadow-sm hover:shadow px-3 py-2 space-x-1 justify-center"
                               title="停止容器"
                             >
                               <Square className="h-5 w-5" />
-                              <span className={cn("text-sm font-medium", viewMode === 'list' && "sr-only")}>停止</span>
+                              <span className="text-sm font-medium">停止</span>
                             </button>
                             <button
                               onClick={() => handleContainerAction(container.id, 'restart')}
-                              className={cn(
-                                "group relative text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-xl transition-all duration-200 flex items-center shadow-sm hover:shadow",
-                                viewMode === 'grid' ? "px-4 py-2.5 space-x-1.5" : "px-3 py-2 space-x-1"
-                              )}
+                              className="group relative text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-xl transition-all duration-200 flex items-center shadow-sm hover:shadow px-3 py-2 space-x-1 justify-center"
                               title="重启容器"
                             >
                               <RotateCcw className="h-5 w-5" />
-                              <span className={cn("text-sm font-medium", viewMode === 'list' && "sr-only")}>重启</span>
+                              <span className="text-sm font-medium">重启</span>
                             </button>
                           </>
                         ) : (
                           <button
                             onClick={() => handleContainerAction(container.id, 'start')}
-                            className={cn(
-                              "group relative text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-xl transition-all duration-200 flex items-center shadow-sm hover:shadow",
-                              viewMode === 'grid' ? "px-4 py-2.5 space-x-1.5" : "px-3 py-2 space-x-1"
-                            )}
+                            className="group relative text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-xl transition-all duration-200 flex items-center shadow-sm hover:shadow px-3 py-2 space-x-1 justify-center"
                             title="启动容器"
                           >
                             <Play className="h-5 w-5" />
-                            <span className={cn("text-sm font-medium", viewMode === 'list' && "sr-only")}>启动</span>
+                            <span className="text-sm font-medium">启动</span>
                           </button>
                         )}
 
                         <button
                           onClick={() => handleUpdateContainer(container.id)}
-                          className={cn(
-                            "group relative text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-xl transition-all duration-200 flex items-center shadow-sm hover:shadow",
-                            viewMode === 'grid' ? "px-4 py-2.5 space-x-1.5" : "px-3 py-2 space-x-1"
-                          )}
+                          className="group relative text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-xl transition-all duration-200 flex items-center shadow-sm hover:shadow px-3 py-2 space-x-1 justify-center"
                           title="更新容器"
                         >
                           <Upload className="h-5 w-5" />
-                          <span className={cn("text-sm font-medium", viewMode === 'list' && "sr-only")}>更新</span>
+                          <span className="text-sm font-medium">更新</span>
                         </button>
 
                         <button
                           onClick={() => setSelectedContainer(container)}
-                          className={cn(
-                            "group relative text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-all duration-200 flex items-center shadow-sm hover:shadow",
-                            viewMode === 'grid' ? "px-4 py-2.5 space-x-1.5" : "px-3 py-2 space-x-1"
-                          )}
+                          className="group relative text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-all duration-200 flex items-center shadow-sm hover:shadow px-3 py-2 space-x-1 justify-center"
                           title="查看详情"
                         >
                           <Info className="h-5 w-5" />
-                          <span className={cn("text-sm font-medium", viewMode === 'list' && "sr-only")}>详情</span>
+                          <span className="text-sm font-medium">详情</span>
                         </button>
                       </>
                     )}
@@ -1294,7 +1203,7 @@ function ContainerDetailModal({ container, onClose, onRename, onUpdate, onAction
               <div className="flex items-center mt-1">
                 {getContainerIcon()}
                 {/* 状态指示器竖线 */}
-                <div className="flex flex-col items-center h-full ml-3">
+                <div className="flex flex-col items-center justify-center h-full ml-3">
                   <div className={cn(
                     "w-1 h-8 rounded-full",
                     getStatusIndicatorColor(currentContainer.status)
