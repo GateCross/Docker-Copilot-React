@@ -39,9 +39,9 @@ export function About() {
             {/* 为赞赏码预留空间 */}
             <div className="mt-6">
               <p className="text-sm text-blue-600 dark:text-blue-400 mb-3">您的支持是我持续维护项目的动力</p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center" id="sponsorship-section">
+              <div className="flex flex-col sm:flex-row gap-16 justify-center" id="sponsorship-section">
                 <div className="flex flex-col items-center">
-                  <div className="rounded-xl overflow-hidden w-40 h-40 flex items-center justify-center bg-white dark:bg-gray-800 transition-colors duration-200">
+                  <div className="rounded-xl overflow-hidden w-40 h-40 flex items-center justify-center bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 shadow-lg transition-all duration-200 hover:shadow-xl hover:border-blue-300 dark:hover:border-blue-500">
                     <img 
                       src="/wechat.jpg" 
                       alt="微信赞赏码" 
@@ -51,7 +51,7 @@ export function About() {
                   <span className="mt-2 text-sm text-blue-700 dark:text-blue-300">微信扫一扫</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <div className="rounded-xl overflow-hidden w-40 h-40 flex items-center justify-center bg-white dark:bg-gray-800 transition-colors duration-200">
+                  <div className="rounded-xl overflow-hidden w-40 h-40 flex items-center justify-center bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 shadow-lg transition-all duration-200 hover:shadow-xl hover:border-blue-300 dark:hover:border-blue-500">
                     <img 
                       src="/alipay.jpg" 
                       alt="支付宝赞赏码" 
