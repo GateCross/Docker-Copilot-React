@@ -7,6 +7,7 @@
 export const builtInImageLogos = {
   "xylplm/media-saber": "https://icon.xiaoge.org/images/docker/MediaSaber.png",
   "jxxghp/moviepilot-v2": "https://raw.dongshu.fun:99/dc/146.png",
+  "0nlylty/dockercopilot": "https://icon.xiaoge.org/images/docker/DockerCopilot-3.png",
   "mtphotos/mt-photos": "https://icon.xiaoge.org/images/docker/MT-Photos.png",
   "kqstone/mt-photos-insightface-unofficial": "https://icon.xiaoge.org/images/docker/MT-Photos.png",
   "mtphotos/mt-photos-ai": "https://icon.xiaoge.org/images/docker/MT-Photos.png",
